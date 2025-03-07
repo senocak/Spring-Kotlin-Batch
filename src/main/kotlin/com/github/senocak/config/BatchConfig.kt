@@ -1,15 +1,18 @@
 package com.github.senocak.config
 
+import com.github.senocak.logger
 import com.github.senocak.model.TrafficDensity
 import com.github.senocak.service.TrafficDensityProcessor
 import com.github.senocak.service.JobCompletionNotificationListener
 import com.github.senocak.service.TrafficDensitySkipListener
 import jakarta.persistence.EntityManagerFactory
+import org.slf4j.Logger
 import org.springframework.batch.core.ChunkListener
 import org.springframework.batch.core.Job
 import org.springframework.batch.core.Step
 import org.springframework.batch.core.configuration.annotation.StepScope
 import org.springframework.batch.core.job.builder.JobBuilder
+import org.springframework.batch.core.launch.support.RunIdIncrementer
 import org.springframework.batch.core.repository.JobRepository
 import org.springframework.batch.core.step.builder.StepBuilder
 import org.springframework.batch.core.step.skip.SkipPolicy
@@ -18,8 +21,11 @@ import org.springframework.batch.item.database.builder.JpaItemWriterBuilder
 import org.springframework.batch.item.file.FlatFileItemReader
 import org.springframework.batch.item.file.MultiResourceItemReader
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder
+import org.springframework.batch.item.file.builder.FlatFileItemWriterBuilder
 import org.springframework.batch.item.file.builder.MultiResourceItemReaderBuilder
 import org.springframework.batch.item.file.transform.FieldSet
+import org.springframework.batch.item.support.SynchronizedItemStreamWriter
+import org.springframework.batch.item.support.builder.SynchronizedItemStreamWriterBuilder
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -83,7 +89,10 @@ class BatchConfig(
 //            .build()
 
     @Bean
-    fun skipPolicy(): SkipPolicy = SkipPolicy { _: Throwable, _: Long -> true } // Always skip on exception, customize as needed
+    fun skipPolicy(): SkipPolicy = SkipPolicy { t: Throwable, skipCount: Long ->
+        skipCount < 1_000 // Allow up to 1000 skips
+        // or true // Always skip on exception, customize as needed
+    }
 
     @Bean
     fun importTrafficDensityStep(): Step =
@@ -94,18 +103,35 @@ class BatchConfig(
             .writer(writer())
             .faultTolerant()
             .skip(Exception::class.java) // Skip on any exception
-            .skipLimit(1000) // Allow up to 1000 skips
+            //.skipLimit(1000) // Allow up to 1000 skips
             .skipPolicy(skipPolicy())
             .processor(trafficDensityProcessor)
             .listener(chunkListener) // Add the chunk listener here
             .listener(trafficDensitySkipListener)
+            .stream(skippedItemsWriter()) // Write skipped items to a file
             .build()
 
     @Bean
     fun importCustomerJob(): Job =
         JobBuilder("importCustomerJob", jobRepository)
+            .incrementer(RunIdIncrementer()) // Optional: Ensures unique job runs
             .start(importTrafficDensityStep())
             .listener(jobCompletionNotificationListener)
+            .build()
+
+    @Bean
+    fun skippedItemsWriter(): SynchronizedItemStreamWriter<TrafficDensity> =
+        SynchronizedItemStreamWriterBuilder<TrafficDensity>()
+            .delegate(
+                FlatFileItemWriterBuilder<TrafficDensity>()
+                    .name("skippedItemsWriter")
+                    .resource(FileSystemResource("skipped_traffic_density.csv"))
+                    .delimited()
+                    .delimiter(",")
+                    .names("dateTime", "latitude", "longitude", "geohash", "minimumSpeed", "maximumSpeed", "averageSpeed", "numberOfVehicles")
+                    .headerCallback { writer -> writer.write("DATE_TIME,LATITUDE,LONGITUDE,GEOHASH,MINIMUM_SPEED,MAXIMUM_SPEED,AVERAGE_SPEED,NUMBER_OF_VEHICLES") }
+                    .build()
+            )
             .build()
 
     @Bean
@@ -123,6 +149,6 @@ class BatchConfig(
             corePoolSize = 5
             maxPoolSize = 10
             queueCapacity = 25
+            initialize()
         }
-
 }
