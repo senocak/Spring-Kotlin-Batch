@@ -83,8 +83,6 @@ class BatchConfig(
     @Bean
     fun restTemplate(): RestTemplate {
         val factory = org.springframework.http.client.SimpleClientHttpRequestFactory()
-        factory.setBufferRequestBody(false)
-        factory.setOutputStreaming(true)
         factory.setChunkSize(8192)
         factory.setConnectTimeout(java.time.Duration.ofMinutes(5))
         factory.setReadTimeout(java.time.Duration.ofMinutes(5))

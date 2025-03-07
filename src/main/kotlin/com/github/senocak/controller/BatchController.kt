@@ -23,6 +23,10 @@ import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.client.RestTemplate
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
+import java.net.URL
+import java.nio.channels.Channels
+import java.nio.channels.ReadableByteChannel
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
 
@@ -40,87 +44,56 @@ class BatchController(
 
     @PostMapping("/download")
     fun download(@RequestParam url: String = "https://data.ibb.gov.tr/dataset/3ee6d744-5da2-40c8-9cd6-0e3e41f1928f/resource/76671ebe-2fd2-426f-b85a-e3772263f483/download/traffic_density_202412.csv"): String {
-        // simulate the user downloading a CSV file of contacts from this controller endpoint
+        // Download file synchronously to see progress bar
         asyncTaskExecutor.execute {
-            downloadFileToResourcesWithProgress(url, "traffic_density_${sdf.format(Timestamp(System.currentTimeMillis()))}.csv")
+            downloadFileWithProgress(fileUrl = url, destinationPath = "traffic_density_${sdf.format(Timestamp(System.currentTimeMillis()))}.csv")
         }
-        return "File downloading started"
+        return "File download completed"
     }
-    fun downloadFileToResourcesWithProgress(url: String, fileName: String) {
-        val resourcesDir = File("src/main/resources")
-        if (!resourcesDir.exists()) {
-            resourcesDir.mkdirs()
-        }
+    fun downloadFileWithProgress(fileUrl: String, destinationPath: String) {
+        try {
+            val url = URL(fileUrl)
+            Channels.newChannel(url.openStream()).use { readableByteChannel: ReadableByteChannel ->
+                FileOutputStream(destinationPath).use { fileOutputStream: FileOutputStream ->
+                    val fileSize: Long = url.openConnection().contentLengthLong
+                    var bytesTransferred = 0L
+                    val buffer = ByteArray(10 * 1024) // 10KB buffer
 
-        val outputFile = File(resourcesDir, fileName)
-        log.info("Downloading file to: ${outputFile.absolutePath}")
+                    while (true) {
+                        val bytesRead: Int = readableByteChannel.read(java.nio.ByteBuffer.wrap(buffer))
+                        if (bytesRead <= 0) break
 
-        val headers = HttpHeaders().apply {
-            accept = listOf(MediaType.APPLICATION_OCTET_STREAM, MediaType.ALL)
-        }
+                        fileOutputStream.write(buffer, 0, bytesRead)
+                        bytesTransferred += bytesRead
 
-        val entity = HttpEntity<Void>(headers)
-
-        val response: ResponseEntity<Resource> = try {
-            restTemplate.exchange(url, HttpMethod.GET, entity, Resource::class.java)
-        } catch (ex: Exception) {
-            log.error("Failed to initiate file download from $url", ex)
-            throw ex
-        }
-
-        if (!response.statusCode.is2xxSuccessful) {
-            log.error("Received non-success response: ${response.statusCode}")
-            throw RuntimeException("Failed to download file, status code: ${response.statusCode}")
-        }
-
-        val contentLength = response.headers.contentLength
-        log.info("Connection established. File size: ${formatSize(contentLength)}")
-
-        val resource = response.body ?: throw RuntimeException("No file received from $url")
-
-        resource.inputStream.use { input ->
-            FileOutputStream(outputFile).use { output ->
-                downloadWithProgress(input, output, contentLength)
-            }
-        }
-
-        log.info("\nFile successfully downloaded to ${outputFile.absolutePath}")
-    }
-
-    private fun downloadWithProgress(input: java.io.InputStream, output: FileOutputStream, totalBytes: Long) {
-        val buffer = ByteArray(8192)
-        var bytesRead: Long = 0
-        var lastLoggedProgress = -1
-
-        while (true) {
-            val read = input.read(buffer)
-            if (read == -1) break
-
-            output.write(buffer, 0, read)
-            bytesRead += read
-
-            if (totalBytes > 0) {
-                val progress = (bytesRead * 100 / totalBytes).toInt()
-                if (progress != lastLoggedProgress) {
-                    logProgressBar(progress)
-                    lastLoggedProgress = progress
+                        if (fileSize > 0) {
+                            val percentage: Double = (bytesTransferred * 100.0) / fileSize
+                            printProgress(bytesTransferred = bytesTransferred, totalSize = fileSize, percentage = percentage)
+                        } else {
+                            print("\rDownloaded: $bytesTransferred bytes")
+                        }
+                    }
+                    log.info("Download completed successfully!")
                 }
             }
+        } catch (e: IOException) {
+            log.error("Error during download: ${e.message}")
+            throw e
+        } catch (e: Exception) {
+            log.error("Failed to download file: ${e.message}")
         }
     }
-
-    private fun logProgressBar(progress: Int) {
-        val barLength = 30
-        val filledLength = (progress * barLength / 100.0).toInt()
-        val bar: String = "█".repeat(filledLength) + "-".repeat(barLength - filledLength)
-        log.info("Downloading: [$bar] $progress%")
-    }
-
-    private fun formatSize(bytes: Long): String {
-        if (bytes <= 0) return "Unknown size"
-        val units = arrayOf("B", "KB", "MB", "GB", "TB")
-        val digitGroups = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt()
-        return "%.2f %s".format(bytes / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
+    private fun printProgress(bytesTransferred: Long, totalSize: Long, percentage: Double) {
+        val width = 50
+        val progress: Int = (percentage / 100 * width).toInt()
+        val bar: String = buildString {
+            append("[")
+            repeat(progress) { append("=") }
+            repeat(width - progress) { append(" ") }
+            append("]")
+        }
+        println("$bar %6.2f%% ($bytesTransferred / $totalSize bytes)")
+        System.out.flush()
     }
 
     @PostMapping("/run")
