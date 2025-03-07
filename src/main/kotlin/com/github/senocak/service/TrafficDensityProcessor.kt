@@ -16,7 +16,7 @@ class TrafficDensityProcessor: ItemProcessor<TrafficDensity, TrafficDensity> {
             log.info("About to skip item with geohash=sxk9jr: $trafficDensity")
             throw IllegalArgumentException("Invalid date")
         }
-        log.info("Processing traffic density: $trafficDensity")
+        //log.info("Processing traffic density: $trafficDensity")
         if (trafficDensity.averageSpeed < avgSpeedThreshold && trafficDensity.numberOfVehicles > 100) {
             log.warn("Possible congestion detected at ${trafficDensity.geohash}: speed=${trafficDensity.averageSpeed}, vehicles=${trafficDensity.numberOfVehicles}")
         }

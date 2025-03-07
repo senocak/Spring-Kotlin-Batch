@@ -1,15 +1,14 @@
 package com.github.senocak.config
 
-import com.github.senocak.logger
 import com.github.senocak.model.TrafficDensity
 import com.github.senocak.service.TrafficDensityProcessor
 import com.github.senocak.service.JobCompletionNotificationListener
 import com.github.senocak.service.TrafficDensitySkipListener
 import jakarta.persistence.EntityManagerFactory
-import org.slf4j.Logger
 import org.springframework.batch.core.ChunkListener
 import org.springframework.batch.core.Job
 import org.springframework.batch.core.Step
+import org.springframework.batch.core.StepExecutionListener
 import org.springframework.batch.core.configuration.annotation.StepScope
 import org.springframework.batch.core.job.builder.JobBuilder
 import org.springframework.batch.core.launch.support.RunIdIncrementer
@@ -19,10 +18,8 @@ import org.springframework.batch.core.step.skip.SkipPolicy
 import org.springframework.batch.item.database.JpaItemWriter
 import org.springframework.batch.item.database.builder.JpaItemWriterBuilder
 import org.springframework.batch.item.file.FlatFileItemReader
-import org.springframework.batch.item.file.MultiResourceItemReader
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder
 import org.springframework.batch.item.file.builder.FlatFileItemWriterBuilder
-import org.springframework.batch.item.file.builder.MultiResourceItemReaderBuilder
 import org.springframework.batch.item.file.transform.FieldSet
 import org.springframework.batch.item.support.SynchronizedItemStreamWriter
 import org.springframework.batch.item.support.builder.SynchronizedItemStreamWriterBuilder
@@ -44,6 +41,7 @@ class BatchConfig(
     private val jobCompletionNotificationListener: JobCompletionNotificationListener,
     private val chunkListener: ChunkListener,
     private val trafficDensitySkipListener: TrafficDensitySkipListener,
+    private val stepExecutionListener: StepExecutionListener
 ) {
     @Bean
     fun writer(): JpaItemWriter<TrafficDensity> =
@@ -108,6 +106,7 @@ class BatchConfig(
             .processor(trafficDensityProcessor)
             .listener(chunkListener) // Add the chunk listener here
             .listener(trafficDensitySkipListener)
+            .listener(stepExecutionListener)
             .stream(skippedItemsWriter()) // Write skipped items to a file
             .build()
 
