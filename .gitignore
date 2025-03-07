@@ -38,3 +38,4 @@ out/
 ### Kotlin ###
 .kotlin
 *.csv
+.DS_Store
