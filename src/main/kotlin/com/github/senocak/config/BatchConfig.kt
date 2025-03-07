@@ -21,6 +21,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.io.FileSystemResource
 import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.web.client.RestTemplate
 
 @Configuration
 @EnableBatchProcessing
@@ -79,4 +80,14 @@ class BatchConfig(
             .listener(jobCompletionNotificationListener)
             .build()
 
+    @Bean
+    fun restTemplate(): RestTemplate {
+        val factory = org.springframework.http.client.SimpleClientHttpRequestFactory()
+        factory.setBufferRequestBody(false)
+        factory.setOutputStreaming(true)
+        factory.setChunkSize(8192)
+        factory.setConnectTimeout(java.time.Duration.ofMinutes(5))
+        factory.setReadTimeout(java.time.Duration.ofMinutes(5))
+        return RestTemplate(factory)
+    }
 }
