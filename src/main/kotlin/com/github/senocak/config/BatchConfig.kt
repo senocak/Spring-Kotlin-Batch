@@ -3,22 +3,28 @@ package com.github.senocak.config
 import com.github.senocak.model.TrafficDensity
 import com.github.senocak.service.TrafficDensityProcessor
 import com.github.senocak.service.JobCompletionNotificationListener
+import com.github.senocak.service.TrafficDensitySkipListener
 import jakarta.persistence.EntityManagerFactory
+import org.springframework.batch.core.ChunkListener
 import org.springframework.batch.core.Job
 import org.springframework.batch.core.Step
 import org.springframework.batch.core.configuration.annotation.StepScope
 import org.springframework.batch.core.job.builder.JobBuilder
 import org.springframework.batch.core.repository.JobRepository
 import org.springframework.batch.core.step.builder.StepBuilder
+import org.springframework.batch.core.step.skip.SkipPolicy
 import org.springframework.batch.item.database.JpaItemWriter
 import org.springframework.batch.item.database.builder.JpaItemWriterBuilder
 import org.springframework.batch.item.file.FlatFileItemReader
+import org.springframework.batch.item.file.MultiResourceItemReader
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder
+import org.springframework.batch.item.file.builder.MultiResourceItemReaderBuilder
 import org.springframework.batch.item.file.transform.FieldSet
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.io.FileSystemResource
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.web.client.RestTemplate
 
@@ -30,6 +36,8 @@ class BatchConfig(
     private val entityManagerFactory: EntityManagerFactory,
     private val trafficDensityProcessor: TrafficDensityProcessor,
     private val jobCompletionNotificationListener: JobCompletionNotificationListener,
+    private val chunkListener: ChunkListener,
+    private val trafficDensitySkipListener: TrafficDensitySkipListener,
 ) {
     @Bean
     fun writer(): JpaItemWriter<TrafficDensity> =
@@ -63,13 +71,34 @@ class BatchConfig(
             //.lineMapper(VehicleCountLineMapper())
             .build()
 
+//    @Bean
+//    fun multiResourceReader(@Value("#{jobParameters['filePath']}") path: String?): MultiResourceItemReader<TrafficDensity> =
+//        MultiResourceItemReaderBuilder<TrafficDensity>()
+//            .name("multiTrafficDensityReader")
+//            .resources(
+//                FileSystemResource(path ?: "traffic_density_202412.csv"),
+//                FileSystemResource("traffic_density_202411.csv")
+//            )
+//            .delegate(reader(null))
+//            .build()
+
+    @Bean
+    fun skipPolicy(): SkipPolicy = SkipPolicy { _: Throwable, _: Long -> true } // Always skip on exception, customize as needed
+
     @Bean
     fun importTrafficDensityStep(): Step =
         StepBuilder("importTrafficDensityStep", jobRepository)
             .chunk<TrafficDensity, TrafficDensity>(10_000, transactionManager)
             .reader(reader(null)) // null path just for type resolution
+            //.reader(multiResourceReader(path = null)) // for multiple files
             .writer(writer())
+            .faultTolerant()
+            .skip(Exception::class.java) // Skip on any exception
+            .skipLimit(1000) // Allow up to 1000 skips
+            .skipPolicy(skipPolicy())
             .processor(trafficDensityProcessor)
+            .listener(chunkListener) // Add the chunk listener here
+            .listener(trafficDensitySkipListener)
             .build()
 
     @Bean
@@ -87,4 +116,13 @@ class BatchConfig(
         factory.setReadTimeout(java.time.Duration.ofMinutes(5))
         return RestTemplate(factory)
     }
+
+    @Bean
+    fun taskExecutor(): ThreadPoolTaskExecutor =
+        ThreadPoolTaskExecutor().apply {
+            corePoolSize = 5
+            maxPoolSize = 10
+            queueCapacity = 25
+        }
+
 }

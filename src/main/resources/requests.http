@@ -3,3 +3,6 @@ POST http://localhost:8089/api/batch/traffic-density/download?url=https://data.i
 
 ### run
 POST http://localhost:8089/api/batch/traffic-density/run?csvName=./traffic_density_202412.csv
+
+### progress
+GET http://localhost:8089/api/batch/traffic-density/progress

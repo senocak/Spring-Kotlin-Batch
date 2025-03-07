@@ -1,6 +1,7 @@
 package com.github.senocak.controller
 
 import com.github.senocak.logger
+import com.github.senocak.service.ProgressTracker
 import org.slf4j.Logger
 import org.springframework.batch.core.Job
 import org.springframework.batch.core.JobParameters
@@ -10,6 +11,8 @@ import org.springframework.batch.core.launch.JobLauncher
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.core.io.FileSystemResource
 import org.springframework.core.task.AsyncTaskExecutor
+import org.springframework.scheduling.annotation.Async
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -22,6 +25,7 @@ import java.nio.channels.Channels
 import java.nio.channels.ReadableByteChannel
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
+import java.util.concurrent.CompletableFuture
 
 @RestController
 @RequestMapping("/api/batch/traffic-density")
@@ -30,7 +34,7 @@ class BatchController(
     private val jobLauncher: JobLauncher,
     private val importVehicleCountJob: Job,
     private val jobExplorer: JobExplorer,
-    @Qualifier("applicationTaskExecutor") private val asyncTaskExecutor: AsyncTaskExecutor,
+    private val tracker: ProgressTracker,
 ) {
     private val log: Logger by logger()
     private val sdf = SimpleDateFormat("yyyy.MM.dd.HH.mm.ss")
@@ -38,12 +42,13 @@ class BatchController(
     @PostMapping("/download")
     fun download(@RequestParam url: String = "https://data.ibb.gov.tr/dataset/3ee6d744-5da2-40c8-9cd6-0e3e41f1928f/resource/76671ebe-2fd2-426f-b85a-e3772263f483/download/traffic_density_202412.csv"): String {
         // Download file asynchronously to see progress bar
-        asyncTaskExecutor.execute {
-            downloadFileWithProgress(fileUrl = url, destinationPath = "traffic_density_${sdf.format(Timestamp(System.currentTimeMillis()))}.csv")
+        val destinationPath = "traffic_density_${sdf.format(Timestamp(System.currentTimeMillis()))}.csv"
+        CompletableFuture.runAsync {
+            downloadFileWithProgress(fileUrl = url, destinationPath = destinationPath)
         }
-        return "File download completed"
+        return destinationPath
     }
-    fun downloadFileWithProgress(fileUrl: String, destinationPath: String) {
+    private fun downloadFileWithProgress(fileUrl: String, destinationPath: String) {
         try {
             val url = URL(fileUrl)
             Channels.newChannel(url.openStream()).use { readableByteChannel: ReadableByteChannel ->
@@ -97,7 +102,13 @@ class BatchController(
             .addString("filePath", csvFile.file.absolutePath)
             .addString("JobID", System.currentTimeMillis().toString())
             .toJobParameters()
-        jobLauncher.run(importVehicleCountJob, params)
+        CompletableFuture.runAsync {
+            tracker.reset()
+            jobLauncher.run(importVehicleCountJob, params)
+        }
         return "Batch job has been invoked"
     }
+
+    @GetMapping("/progress")
+    fun getProgress() = tracker
 }
