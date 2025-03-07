@@ -4,6 +4,7 @@ import com.github.senocak.logger
 import com.github.senocak.service.ProgressTracker
 import org.slf4j.Logger
 import org.springframework.batch.core.Job
+import org.springframework.batch.core.JobExecution
 import org.springframework.batch.core.JobParameters
 import org.springframework.batch.core.JobParametersBuilder
 import org.springframework.batch.core.explore.JobExplorer
@@ -96,17 +97,26 @@ class BatchController(
 
     @PostMapping("/run")
     fun run(@RequestParam csvName: String): String {
-        // simulate the user uploading a CSV file of contacts to this controller endpoint
+        log.info("Starting batch job with file: $csvName")
         val csvFile = FileSystemResource(csvName)
+        if (!csvFile.exists()) {
+            val error = "CSV file not found: $csvName"
+            log.error(error)
+            throw IllegalArgumentException(error)
+        }
         val params: JobParameters = JobParametersBuilder()
             .addString("filePath", csvFile.file.absolutePath)
             .addString("JobID", System.currentTimeMillis().toString())
             .toJobParameters()
-        CompletableFuture.runAsync {
+        try {
             tracker.reset()
-            jobLauncher.run(importVehicleCountJob, params)
+            val jobExecution: JobExecution = jobLauncher.run(importVehicleCountJob, params)
+            log.info("Job completed with status: ${jobExecution.status}")
+            return "Batch job completed with status: ${jobExecution.status}"
+        } catch (e: Exception) {
+            log.error("Error running batch job: ${e.message}", e)
+            throw e
         }
-        return "Batch job has been invoked"
     }
 
     @GetMapping("/progress")

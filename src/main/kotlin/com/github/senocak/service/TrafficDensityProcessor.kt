@@ -13,8 +13,8 @@ class TrafficDensityProcessor: ItemProcessor<TrafficDensity, TrafficDensity> {
 
     override fun process(trafficDensity: TrafficDensity): TrafficDensity {
         if (trafficDensity.geohash == "sxk9jr") {
-            log.info("About to skip item with geohash=sxk9jr: $trafficDensity")
-            throw IllegalArgumentException("Invalid date")
+            log.warn("About to skip item with geohash=sxk9jr: $trafficDensity")
+            throw IllegalArgumentException("Skipping record with geohash=sxk9jr")
         }
         //log.info("Processing traffic density: $trafficDensity")
         if (trafficDensity.averageSpeed < avgSpeedThreshold && trafficDensity.numberOfVehicles > 100) {

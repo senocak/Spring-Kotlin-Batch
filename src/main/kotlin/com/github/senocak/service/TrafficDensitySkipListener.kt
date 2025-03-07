@@ -13,16 +13,16 @@ class TrafficDensitySkipListener(
     private val log: Logger by logger()
 
     override fun onSkipInRead(t: Throwable) {
-        log.error("Skipped item during read due to: ${t.message}", t)
+        log.error("Skip Listener - onSkipInRead called with exception: ${t.message}", t)
     }
 
     override fun onSkipInProcess(item: TrafficDensity, t: Throwable) {
-        log.error("Skipped item in process: $item due to ${t.message}")
+        log.error("Skip Listener - onSkipInProcess called for item: $item, Exception: ${t.message}", t)
         progressTracker.totalRead++
     }
 
     override fun onSkipInWrite(item: TrafficDensity, t: Throwable) {
-        log.warn("Skipped write for item due to ${t.message}: $item")
+        log.error("Skip Listener - onSkipInWrite called for item: $item, Exception: ${t.message}", t)
         progressTracker.totalWritten--
     }
 }

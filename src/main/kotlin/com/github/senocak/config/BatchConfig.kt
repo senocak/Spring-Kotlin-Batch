@@ -2,7 +2,7 @@ package com.github.senocak.config
 
 import com.github.senocak.model.TrafficDensity
 import com.github.senocak.service.TrafficDensityProcessor
-import com.github.senocak.service.JobCompletionNotificationListener
+import com.github.senocak.service.JobNotificationExecutionListener
 import com.github.senocak.service.TrafficDensitySkipListener
 import jakarta.persistence.EntityManagerFactory
 import org.springframework.batch.core.ChunkListener
@@ -38,7 +38,7 @@ class BatchConfig(
     private val transactionManager: PlatformTransactionManager,
     private val entityManagerFactory: EntityManagerFactory,
     private val trafficDensityProcessor: TrafficDensityProcessor,
-    private val jobCompletionNotificationListener: JobCompletionNotificationListener,
+    private val jobNotificationExecutionListener: JobNotificationExecutionListener,
     private val chunkListener: ChunkListener,
     private val trafficDensitySkipListener: TrafficDensitySkipListener,
     private val stepExecutionListener: StepExecutionListener
@@ -98,14 +98,15 @@ class BatchConfig(
             .chunk<TrafficDensity, TrafficDensity>(10_000, transactionManager)
             .reader(reader(null)) // null path just for type resolution
             //.reader(multiResourceReader(path = null)) // for multiple files
+            .processor(trafficDensityProcessor) // if you move it down, skip listener won't work
             .writer(writer())
             .faultTolerant()
-            .skip(Exception::class.java) // Skip on any exception
+            .skip(Exception::class.java)
             //.skipLimit(1000) // Allow up to 1000 skips
             .skipPolicy(skipPolicy())
-            .processor(trafficDensityProcessor)
+            .processorNonTransactional()
             .listener(chunkListener) // Add the chunk listener here
-            .listener(trafficDensitySkipListener)
+            .listener(trafficDensitySkipListener as org.springframework.batch.core.SkipListener<TrafficDensity, TrafficDensity>)
             .listener(stepExecutionListener)
             .stream(skippedItemsWriter()) // Write skipped items to a file
             .build()
@@ -115,7 +116,7 @@ class BatchConfig(
         JobBuilder("importCustomerJob", jobRepository)
             .incrementer(RunIdIncrementer()) // Optional: Ensures unique job runs
             .start(importTrafficDensityStep())
-            .listener(jobCompletionNotificationListener)
+            .listener(jobNotificationExecutionListener)
             .build()
 
     @Bean

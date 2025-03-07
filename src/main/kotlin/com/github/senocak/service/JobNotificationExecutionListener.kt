@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component
 import java.util.Date
 
 @Component
-class JobCompletionNotificationListener: JobExecutionListener {
+class JobNotificationExecutionListener: JobExecutionListener {
     private val log: Logger by logger()
     private var start: Long = 0
 

@@ -1,5 +1,10 @@
 server:
   port: 8089
+
+logging:
+  level:
+    com.github.senocak: info
+    org.springframework.batch: info
 spring:
   application:
     name: Spring-Kotlin-Batch

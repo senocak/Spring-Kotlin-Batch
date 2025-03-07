@@ -24,6 +24,6 @@ class ChunkProgressListener(
     }
 
     override fun afterChunkError(context: ChunkContext) {
-        log.info("Error in chunk: ${context.stepContext.stepExecution}")
+        log.warn("Error in chunk: ${context.stepContext.stepExecution}")
     }
 }
