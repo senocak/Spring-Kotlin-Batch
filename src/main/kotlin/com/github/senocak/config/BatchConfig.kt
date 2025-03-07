@@ -108,7 +108,7 @@ class BatchConfig(
             .listener(chunkListener) // Add the chunk listener here
             .listener(trafficDensitySkipListener as org.springframework.batch.core.SkipListener<TrafficDensity, TrafficDensity>)
             .listener(stepExecutionListener)
-            .stream(skippedItemsWriter()) // Write skipped items to a file
+            .stream(skippedItemsWriter(filePath = "skipped_traffic_density.csv")) // Write skipped items to a file
             .build()
 
     @Bean
@@ -120,12 +120,12 @@ class BatchConfig(
             .build()
 
     @Bean
-    fun skippedItemsWriter(): SynchronizedItemStreamWriter<TrafficDensity> =
+    fun skippedItemsWriter(@Value("\${spring.batch.skipped-items-file:skipped_traffic_density.csv}") filePath: String): SynchronizedItemStreamWriter<TrafficDensity> =
         SynchronizedItemStreamWriterBuilder<TrafficDensity>()
             .delegate(
                 FlatFileItemWriterBuilder<TrafficDensity>()
                     .name("skippedItemsWriter")
-                    .resource(FileSystemResource("skipped_traffic_density.csv"))
+                    .resource(FileSystemResource(filePath))
                     .delimited()
                     .delimiter(",")
                     .names("dateTime", "latitude", "longitude", "geohash", "minimumSpeed", "maximumSpeed", "averageSpeed", "numberOfVehicles")

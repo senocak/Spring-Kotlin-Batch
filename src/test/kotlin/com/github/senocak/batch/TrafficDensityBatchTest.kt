@@ -6,6 +6,8 @@ import com.github.senocak.service.TrafficDensitySkipListener
 import com.github.senocak.logger
 import jakarta.persistence.EntityManager
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.springframework.batch.core.BatchStatus
 import org.springframework.batch.core.JobParametersBuilder
@@ -15,6 +17,9 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.Paths
 
 @SpringBootTest
 @SpringBatchTest
@@ -32,6 +37,21 @@ class TrafficDensityBatchTest {
     private lateinit var trafficDensitySkipListener: TrafficDensitySkipListener
 
     private val log: org.slf4j.Logger by logger()
+    private val skippedItemsFile = java.io.File("skipped_traffic_density.csv")
+
+    @BeforeEach
+    fun setup() {
+        if (skippedItemsFile.exists()) {
+            skippedItemsFile.delete()
+        }
+    }
+
+    @AfterEach
+    fun cleanup() {
+        if (skippedItemsFile.exists()) {
+            skippedItemsFile.delete()
+        }
+    }
 
     @Test
     fun `test traffic density import with skip`() {
@@ -103,5 +123,21 @@ class TrafficDensityBatchTest {
         .singleResult
 
         assertEquals(0L, skippedRecord, "Skipped record should not exist in database")
+
+        // Verify skipped items file
+        assertTrue(skippedItemsFile.exists(), "Skipped items file should exist")
+        val skippedFileContent = skippedItemsFile.readLines()
+
+        // Verify header
+        assertTrue(skippedFileContent.isNotEmpty(), "Skipped items file should not be empty")
+        assertEquals("DATE_TIME,LATITUDE,LONGITUDE,GEOHASH,MINIMUM_SPEED,MAXIMUM_SPEED,AVERAGE_SPEED,NUMBER_OF_VEHICLES",
+            skippedFileContent[0], "Header should match expected format")
+
+        // Verify skipped record content
+        assertTrue(skippedFileContent.size > 1, "Should have at least one skipped record")
+        assertTrue(skippedFileContent.any { it.contains("sxk9jr") }, "Should contain the skipped record with geohash sxk9jr")
+
+        // Cleanup
+        skippedItemsFile.delete()
     }
 }
