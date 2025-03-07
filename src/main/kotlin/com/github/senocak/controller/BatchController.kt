@@ -8,20 +8,13 @@ import org.springframework.batch.core.JobParametersBuilder
 import org.springframework.batch.core.explore.JobExplorer
 import org.springframework.batch.core.launch.JobLauncher
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.core.io.ClassPathResource
-import org.springframework.core.io.Resource
+import org.springframework.core.io.FileSystemResource
 import org.springframework.core.task.AsyncTaskExecutor
-import org.springframework.http.HttpEntity
-import org.springframework.http.HttpHeaders
-import org.springframework.http.HttpMethod
-import org.springframework.http.MediaType
-import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.client.RestTemplate
-import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.net.URL
@@ -44,7 +37,7 @@ class BatchController(
 
     @PostMapping("/download")
     fun download(@RequestParam url: String = "https://data.ibb.gov.tr/dataset/3ee6d744-5da2-40c8-9cd6-0e3e41f1928f/resource/76671ebe-2fd2-426f-b85a-e3772263f483/download/traffic_density_202412.csv"): String {
-        // Download file synchronously to see progress bar
+        // Download file asynchronously to see progress bar
         asyncTaskExecutor.execute {
             downloadFileWithProgress(fileUrl = url, destinationPath = "traffic_density_${sdf.format(Timestamp(System.currentTimeMillis()))}.csv")
         }
@@ -97,9 +90,9 @@ class BatchController(
     }
 
     @PostMapping("/run")
-    fun run(): String {
+    fun run(@RequestParam csvName: String): String {
         // simulate the user uploading a CSV file of contacts to this controller endpoint
-        val csvFile = ClassPathResource("traffic_density_202412.csv")
+        val csvFile = FileSystemResource(csvName)
         val params: JobParameters = JobParametersBuilder()
             .addString("filePath", csvFile.file.absolutePath)
             .addString("JobID", System.currentTimeMillis().toString())

@@ -37,4 +37,4 @@ out/
 
 ### Kotlin ###
 .kotlin
-.csv
+*.csv

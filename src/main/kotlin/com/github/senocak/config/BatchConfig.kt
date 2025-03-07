@@ -6,7 +6,6 @@ import com.github.senocak.service.JobCompletionNotificationListener
 import jakarta.persistence.EntityManagerFactory
 import org.springframework.batch.core.Job
 import org.springframework.batch.core.Step
-import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing
 import org.springframework.batch.core.configuration.annotation.StepScope
 import org.springframework.batch.core.job.builder.JobBuilder
 import org.springframework.batch.core.repository.JobRepository
@@ -24,7 +23,7 @@ import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.web.client.RestTemplate
 
 @Configuration
-@EnableBatchProcessing
+//@EnableBatchProcessing // Spring Boot 3.x, this annotation disables auto-configuration, including schema initialization.
 class BatchConfig(
     private val jobRepository: JobRepository,
     private val transactionManager: PlatformTransactionManager,
