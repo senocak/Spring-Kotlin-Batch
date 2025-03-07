@@ -22,7 +22,7 @@ A Spring Boot application written in Kotlin that processes traffic density data 
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/Spring-Kotlin-Batch.git
+   git clone https://github.com/senocak/Spring-Kotlin-Batch.git
    cd Spring-Kotlin-Batch
    ```
 
