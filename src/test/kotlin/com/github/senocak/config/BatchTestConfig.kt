@@ -7,7 +7,5 @@ import org.springframework.context.annotation.Bean
 @TestConfiguration
 class BatchTestConfig {
     @Bean
-    fun jobLauncherTestUtils(): JobLauncherTestUtils {
-        return JobLauncherTestUtils()
-    }
+    fun jobLauncherTestUtils(): JobLauncherTestUtils = JobLauncherTestUtils()
 }

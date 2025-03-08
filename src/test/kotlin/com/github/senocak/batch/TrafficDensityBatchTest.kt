@@ -37,7 +37,7 @@ class TrafficDensityBatchTest {
     private lateinit var trafficDensitySkipListener: TrafficDensitySkipListener
 
     private val log: org.slf4j.Logger by logger()
-    private val skippedItemsFile = java.io.File("skipped_traffic_density.csv")
+    private val skippedItemsFile = File("skipped_traffic_density.csv")
 
     @BeforeEach
     fun setup() {

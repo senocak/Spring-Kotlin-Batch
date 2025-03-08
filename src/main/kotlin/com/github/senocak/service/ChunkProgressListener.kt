@@ -24,7 +24,7 @@ class ChunkProgressListener(
             skipCount = stepExecution.skipCount
             lastUpdate = System.currentTimeMillis()
         }
-        log.info("Chunk completed for job $jobId: ${tracker.getProgress(jobId).totalWritten} items written")
+        log.info("Chunk completed for job $jobId: ${tracker.getProgress(jobId = jobId).totalWritten} items written")
     }
 
     override fun afterChunkError(context: ChunkContext) {
