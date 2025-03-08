@@ -3,6 +3,7 @@ package com.github.senocak.service
 import com.github.senocak.logger
 import com.github.senocak.model.TrafficDensity
 import org.slf4j.Logger
+import org.springframework.batch.core.JobExecution
 import org.springframework.batch.core.SkipListener
 import org.springframework.batch.item.Chunk
 import org.springframework.batch.item.support.SynchronizedItemStreamWriter
@@ -20,9 +21,20 @@ class TrafficDensitySkipListener(
         log.error("Skip Listener - onSkipInRead called with exception: ${t.message}", t)
     }
 
+    private fun getJobId(): String {
+        // Access the current job execution context through Spring's ExecutionContext
+        val jobExecution: JobExecution = org.springframework.batch.core.scope.context.JobSynchronizationManager.getContext()?.jobExecution
+            ?: throw IllegalStateException("No job execution context found")
+        return jobExecution.jobParameters.getString("JobID")
+            ?: throw IllegalStateException("JobID parameter is missing")
+    }
+
     override fun onSkipInProcess(item: TrafficDensity, t: Throwable) {
         log.error("Skip Listener - onSkipInProcess called for item: $item, Exception: ${t.message}", t)
-        progressTracker.totalRead++
+        val jobId: String = getJobId()
+        progressTracker.updateProgress(jobId = jobId) {
+            totalRead++
+        }
         try {
             val chunk = Chunk<TrafficDensity>()
             chunk.add(item)
@@ -34,7 +46,10 @@ class TrafficDensitySkipListener(
 
     override fun onSkipInWrite(item: TrafficDensity, t: Throwable) {
         log.error("Skip Listener - onSkipInWrite called for item: $item, Exception: ${t.message}")
-        progressTracker.totalWritten--
+        val jobId: String = getJobId()
+        progressTracker.updateProgress(jobId = jobId) {
+            totalWritten--
+        }
         try {
             val chunk = Chunk<TrafficDensity>()
             chunk.add(item)

@@ -1,20 +1,33 @@
 package com.github.senocak.service
 
 import org.springframework.stereotype.Component
+import java.util.concurrent.ConcurrentHashMap
 
 @Component
 class ProgressTracker {
-    var totalRead: Long = 0
-    var totalWritten: Long = 0
-    var lastUpdate: Long = System.currentTimeMillis()
-    var skipCount: Long = 0
+    private val progressMap = ConcurrentHashMap<String, JobProgress>()
 
-    fun reset() {
-        totalRead = 0
-        totalWritten = 0
-        lastUpdate = System.currentTimeMillis()
-        skipCount = 0
+    data class JobProgress(
+        var totalRead: Long = 0,
+        var totalWritten: Long = 0,
+        var lastUpdate: Long = System.currentTimeMillis(),
+        var skipCount: Long = 0
+    )
+
+    fun getProgress(jobId: String): JobProgress =
+        progressMap.getOrPut(key = jobId) { JobProgress() }
+
+    fun reset(jobId: String) {
+        progressMap[jobId] = JobProgress()
     }
 
-    override fun toString(): String = "ProgressTracker(totalRead=$totalRead, totalWritten=$totalWritten, lastUpdate=$lastUpdate, skipCount=$skipCount)"
+    fun updateProgress(jobId: String, block: JobProgress.() -> Unit) {
+        progressMap[jobId] = getProgress(jobId = jobId).apply(block)
+    }
+
+    fun removeProgress(jobId: String) {
+        progressMap.remove(jobId)
+    }
+
+    override fun toString(): String = "ProgressTracker(jobs=${progressMap.keys.size}, progress=$progressMap)"
 }

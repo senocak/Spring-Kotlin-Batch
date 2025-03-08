@@ -105,12 +105,13 @@ class BatchController(
             log.error(error)
             throw IllegalArgumentException(error)
         }
+        val jobId: String = System.currentTimeMillis().toString()
         val params: JobParameters = JobParametersBuilder()
             .addString("filePath", csvFile.file.absolutePath)
-            .addString("JobID", System.currentTimeMillis().toString())
+            .addString("JobID", jobId)
             .toJobParameters()
         try {
-            tracker.reset() // TODO: make it specific for each job
+            tracker.reset(jobId = jobId)
             val jobExecution: JobExecution = jobLauncher.run(importVehicleCountJob, params)
             log.info("Job completed with status: ${jobExecution.status}")
             return "Batch job completed with status: ${jobExecution.status}"
@@ -120,8 +121,8 @@ class BatchController(
         }
     }
 
-    @GetMapping("/progress")
-    fun getProgress(): ProgressTracker = tracker
+    @GetMapping("/progress/{jobId}")
+    fun getProgress(@PathVariable jobId: String): ProgressTracker.JobProgress = tracker.getProgress(jobId = jobId)
 
     @GetMapping("/jobs")
     fun getAllJobExecutions(): List<Map<String, Any>> {
@@ -131,6 +132,7 @@ class BatchController(
                     jobExplorer.getJobExecutions(jobInstance).map { execution: JobExecution ->
                         mapOf(
                             "jobExecutionId" to execution.id,
+                            "jobID" to execution.jobParameters.getString("JobID")!!,
                             "jobName" to execution.jobInstance.jobName,
                             "status" to execution.status.toString(),
                             "startTime" to (execution.startTime?.format(ISO_DATE_TIME) ?: ""),

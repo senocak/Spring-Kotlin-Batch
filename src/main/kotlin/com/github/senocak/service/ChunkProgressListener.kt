@@ -15,15 +15,29 @@ class ChunkProgressListener(
 
     override fun afterChunk(context: ChunkContext) {
         val stepExecution: StepExecution = context.stepContext.stepExecution
-        log.info("Chunk completed: ${context.isComplete}. stepExecution: $stepExecution")
-        tracker.totalRead = stepExecution.readCount
-        tracker.totalWritten = stepExecution.writeCount
-        tracker.skipCount = stepExecution.skipCount
-        tracker.lastUpdate = System.currentTimeMillis()
-        log.info("Chunk completed: ${tracker.totalWritten} items written")
+        val jobId: String = stepExecution.jobExecution.jobParameters.getString("JobID")
+            ?: throw IllegalStateException("JobID parameter is missing")
+        log.info("Chunk completed: ${context.isComplete}. StepExecution: $stepExecution")
+        tracker.updateProgress(jobId = jobId) {
+            totalRead = stepExecution.readCount
+            totalWritten = stepExecution.writeCount
+            skipCount = stepExecution.skipCount
+            lastUpdate = System.currentTimeMillis()
+        }
+        log.info("Chunk completed for job $jobId: ${tracker.getProgress(jobId).totalWritten} items written")
     }
 
     override fun afterChunkError(context: ChunkContext) {
-        log.warn("Error in chunk: ${context.stepContext.stepExecution}")
+        val stepExecution: StepExecution = context.stepContext.stepExecution
+        val jobId: String = stepExecution.jobExecution.jobParameters.getString("JobID")
+            ?: throw IllegalStateException("JobID parameter is missing")
+        log.warn("Error in chunk for job $jobId, StepExecution: $stepExecution")
+        // Update progress even in case of error to maintain accurate counts
+        tracker.updateProgress(jobId = jobId) {
+            totalRead = stepExecution.readCount
+            totalWritten = stepExecution.writeCount
+            skipCount = stepExecution.skipCount
+            lastUpdate = System.currentTimeMillis()
+        }
     }
 }

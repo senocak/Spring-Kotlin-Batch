@@ -4,11 +4,15 @@ POST http://localhost:8089/api/batch/traffic-density/download?url=https://data.i
 ### Run batch job with specified CSV file
 POST http://localhost:8089/api/batch/traffic-density/run?csvName=./traffic_density_202412.csv
 
-### Get current progress of the batch job
-GET http://localhost:8089/api/batch/traffic-density/progress
-
 ### Get all job executions
 GET http://localhost:8089/api/batch/traffic-density/jobs
+
+> {%
+    client.global.set("jobID", response.body[0].jobID);
+%}
+
+### Get current progress of the batch job
+GET http://localhost:8089/api/batch/traffic-density/progress/{{jobID}}
 
 ### Get currently running jobs
 GET http://localhost:8089/api/batch/traffic-density/jobs/running

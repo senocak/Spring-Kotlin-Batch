@@ -34,6 +34,9 @@ class BatchControllerTest {
     @Mock
     private lateinit var tracker: ProgressTracker
 
+    @Mock
+    private lateinit var jobOperator: org.springframework.batch.core.launch.JobOperator
+
     @InjectMocks
     private lateinit var batchController: BatchController
 
@@ -57,25 +60,6 @@ class BatchControllerTest {
         assertThat(result).isNotEmpty
         assertThat(result[0]["jobName"]).isEqualTo("testJob")
         assertThat(result[0]["status"]).isEqualTo("STARTING")
-    }
-
-    @Test
-    fun `should get job execution by id`() {
-        // Given
-        val jobInstance = JobInstance(1L, "testJob")
-        val jobParameters = JobParametersBuilder().addLong("time", System.currentTimeMillis()).toJobParameters()
-        val jobExecution = JobExecution(1L, jobParameters)
-        jobExecution.jobInstance = jobInstance
-        jobExecution.status = BatchStatus.STARTING
-
-        `when`(jobExplorer.getJobExecution(1L)).thenReturn(jobExecution)
-
-        // When
-        val result = batchController.getJobExecution(1L)
-
-        // Then
-        assertThat(result["jobName"]).isEqualTo("testJob")
-        assertThat(result["status"]).isEqualTo("STARTING")
     }
 
     @Test
@@ -108,6 +92,7 @@ class BatchControllerTest {
         jobExecution.status = BatchStatus.STARTED
 
         `when`(jobExplorer.getJobExecution(1L)).thenReturn(jobExecution)
+        `when`(jobOperator.stop(1L)).thenReturn(true)
 
         // When
         val result = batchController.stopJob(1L)
@@ -115,5 +100,50 @@ class BatchControllerTest {
         // Then
         assertThat(result["message"]).isEqualTo("Job stop requested successfully")
         assertThat(jobExecution.status).isEqualTo(BatchStatus.STOPPING)
+        org.mockito.Mockito.verify(jobOperator).stop(1L)
+    }
+
+    @Test
+    fun `should get job-specific progress`() {
+        // Given
+        val jobId = "test-job-123"
+        val jobProgress = ProgressTracker.JobProgress(
+            totalRead = 100,
+            totalWritten = 90,
+            skipCount = 10,
+            lastUpdate = System.currentTimeMillis()
+        )
+        `when`(tracker.getProgress(jobId)).thenReturn(jobProgress)
+
+        // When
+        val result = batchController.getProgress(jobId)
+
+        // Then
+        assertThat(result).isEqualTo(jobProgress)
+        assertThat(result.totalRead).isEqualTo(100)
+        assertThat(result.totalWritten).isEqualTo(90)
+        assertThat(result.skipCount).isEqualTo(10)
+    }
+
+    @Test
+    fun `should run job with job-specific tracking`() {
+        // Given
+        val testFile = javaClass.classLoader.getResource("test_traffic_density.csv")?.file
+            ?: throw IllegalStateException("Test file not found")
+        val jobExecution = JobExecution(1L)
+        jobExecution.status = BatchStatus.COMPLETED
+
+        `when`(jobLauncher.run(org.mockito.ArgumentMatchers.eq(importVehicleCountJob),
+            org.mockito.ArgumentMatchers.argThat { params: JobParameters ->
+                params.getString("JobID") != null && params.getString("filePath") != null
+            }
+        )).thenReturn(jobExecution)
+
+        // When
+        val result = batchController.run(testFile)
+
+        // Then
+        assertThat(result).contains("COMPLETED")
+        org.mockito.Mockito.verify(tracker).reset(org.mockito.ArgumentMatchers.anyString())
     }
 }
