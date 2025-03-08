@@ -5,12 +5,16 @@ import com.github.senocak.service.ProgressTracker
 import org.slf4j.Logger
 import org.springframework.batch.core.Job
 import org.springframework.batch.core.JobExecution
+import org.springframework.batch.core.JobInstance
 import org.springframework.batch.core.JobParameters
 import org.springframework.batch.core.JobParametersBuilder
+import org.springframework.batch.core.StepExecution
 import org.springframework.batch.core.explore.JobExplorer
 import org.springframework.batch.core.launch.JobLauncher
+import org.springframework.batch.core.launch.JobOperator
 import org.springframework.core.io.FileSystemResource
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -22,6 +26,7 @@ import java.nio.channels.Channels
 import java.nio.channels.ReadableByteChannel
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
+import java.time.format.DateTimeFormatter.ISO_DATE_TIME
 import java.util.concurrent.CompletableFuture
 
 @RestController
@@ -30,6 +35,7 @@ class BatchController(
     private val jobLauncher: JobLauncher,
     private val importVehicleCountJob: Job,
     private val jobExplorer: JobExplorer,
+    private val jobOperator: JobOperator,
     private val tracker: ProgressTracker,
 ) {
     private val log: Logger by logger()
@@ -104,7 +110,7 @@ class BatchController(
             .addString("JobID", System.currentTimeMillis().toString())
             .toJobParameters()
         try {
-            tracker.reset()
+            tracker.reset() // TODO: make it specific for each job
             val jobExecution: JobExecution = jobLauncher.run(importVehicleCountJob, params)
             log.info("Job completed with status: ${jobExecution.status}")
             return "Batch job completed with status: ${jobExecution.status}"
@@ -115,5 +121,61 @@ class BatchController(
     }
 
     @GetMapping("/progress")
-    fun getProgress() = tracker
+    fun getProgress(): ProgressTracker = tracker
+
+    @GetMapping("/jobs")
+    fun getAllJobExecutions(): List<Map<String, Any>> {
+        return jobExplorer.jobNames.flatMap { jobName: String ->
+            jobExplorer.getJobInstances(jobName, 0, Int.MAX_VALUE)
+                .flatMap { jobInstance: JobInstance ->
+                    jobExplorer.getJobExecutions(jobInstance).map { execution: JobExecution ->
+                        mapOf(
+                            "jobExecutionId" to execution.id,
+                            "jobName" to execution.jobInstance.jobName,
+                            "status" to execution.status.toString(),
+                            "startTime" to (execution.startTime?.format(ISO_DATE_TIME) ?: ""),
+                            "endTime" to (execution.endTime?.format(ISO_DATE_TIME) ?: ""),
+                            "exitStatus" to execution.exitStatus.exitCode,
+                            "stepExecutions" to execution.stepExecutions.map { stepExecution: StepExecution ->
+                                mapOf(
+                                    "stepName" to stepExecution.stepName,
+                                    "status" to stepExecution.status.toString(),
+                                    "readCount" to stepExecution.readCount,
+                                    "writeCount" to stepExecution.writeCount,
+                                    "commitCount" to stepExecution.commitCount,
+                                    "rollbackCount" to stepExecution.rollbackCount
+                                )
+                            }
+                        )
+                    }
+                }
+        }
+    }
+
+    @GetMapping("/jobs/running")
+    fun getRunningExecutions(): List<Map<String, Any>> =
+        jobExplorer.findRunningJobExecutions(importVehicleCountJob.name).map { execution: JobExecution ->
+            mapOf(
+                "jobExecutionId" to execution.id,
+                "jobName" to execution.jobInstance.jobName,
+                "status" to execution.status.toString(),
+                "startTime" to (execution.startTime?.format(ISO_DATE_TIME) ?: "")
+            )
+        }
+
+    @PostMapping("/jobs/{executionId}/stop")
+    fun stopJob(@PathVariable executionId: Long): Map<String, String> {
+        val jobExecution: JobExecution = jobExplorer.getJobExecution(executionId)
+            ?: throw IllegalArgumentException("Job execution not found with id: $executionId")
+        return when {
+            jobExecution.isRunning -> {
+                jobExecution.status = org.springframework.batch.core.BatchStatus.STOPPING
+                jobOperator.stop(executionId)
+                mapOf(pair = "message" to "Job stop requested successfully")
+            }
+            else -> {
+                mapOf(pair = "message" to "Job is not running")
+            }
+        }
+    }
 }

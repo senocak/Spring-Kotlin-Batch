@@ -73,6 +73,25 @@ POST /api/batch/traffic-density/run
 Parameters:
 - `csvName`: Name of the CSV file to process
 
+3. Get All Job Executions:
+```http
+GET /api/batch/traffic-density/jobs
+```
+Returns a list of all job executions with their details.
+
+4. Get Running Job Executions:
+```http
+GET /api/batch/traffic-density/jobs/running
+```
+Returns a list of currently running job executions.
+
+5. Stop Job Execution:
+```http
+POST /api/batch/traffic-density/jobs/{executionId}/stop
+```
+Parameters:
+- `executionId`: ID of the job execution to stop
+
 ### Example Usage
 
 1. Download traffic density data:
@@ -85,6 +104,21 @@ curl -X POST "http://localhost:8089/api/batch/traffic-density/download"
 curl -X POST "http://localhost:8089/api/batch/traffic-density/run?csvName=traffic_density_2024.02.20.10.30.00.csv"
 ```
 
+3. Get all job executions:
+```bash
+curl -X GET "http://localhost:8089/api/batch/traffic-density/jobs"
+```
+
+4. Get running job executions:
+```bash
+curl -X GET "http://localhost:8089/api/batch/traffic-density/jobs/running"
+```
+
+5. Stop a job execution:
+```bash
+curl -X POST "http://localhost:8089/api/batch/traffic-density/jobs/1/stop"
+```
+
 ## Features
 
 - Asynchronous file download with progress tracking
@@ -93,6 +127,11 @@ curl -X POST "http://localhost:8089/api/batch/traffic-density/run?csvName=traffi
 - RESTful API endpoints
 - Configurable database connection
 - Robust error handling
+- Comprehensive job management:
+  - Job execution monitoring
+  - Running jobs tracking
+  - Job execution control (stop/restart)
+  - Detailed job execution history
 
 ## Reference Documentation
 

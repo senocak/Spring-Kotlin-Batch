@@ -112,8 +112,8 @@ class BatchConfig(
             .build()
 
     @Bean
-    fun importCustomerJob(): Job =
-        JobBuilder("importCustomerJob", jobRepository)
+    fun importTrafficDensityJob(): Job =
+        JobBuilder("importTrafficDensityJob", jobRepository)
             .incrementer(RunIdIncrementer()) // Optional: Ensures unique job runs
             .start(importTrafficDensityStep())
             .listener(jobNotificationExecutionListener)
