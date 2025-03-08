@@ -16,7 +16,7 @@ class ChunkProgressListener(
     override fun afterChunk(context: ChunkContext) {
         val stepExecution: StepExecution = context.stepContext.stepExecution
         val jobId: String = stepExecution.jobExecution.jobParameters.getString("JobID")
-            ?: throw IllegalStateException("JobID parameter is missing")
+            ?: stepExecution.jobExecution.id.toString()
         log.info("Chunk completed: ${context.isComplete}. StepExecution: $stepExecution")
         tracker.updateProgress(jobId = jobId) {
             totalRead = stepExecution.readCount
@@ -30,8 +30,14 @@ class ChunkProgressListener(
     override fun afterChunkError(context: ChunkContext) {
         val stepExecution: StepExecution = context.stepContext.stepExecution
         val jobId: String = stepExecution.jobExecution.jobParameters.getString("JobID")
-            ?: throw IllegalStateException("JobID parameter is missing")
-        log.warn("Error in chunk for job $jobId, StepExecution: $stepExecution")
+            ?: stepExecution.jobExecution.id.toString()
+
+        // Check if this is a skip rather than an error
+        if (context.getAttribute("skip") != null || stepExecution.skipCount > 0) {
+            log.info("Skip occurred in chunk for job $jobId, continuing processing")
+        } else {
+            log.warn("Error in chunk for job $jobId, StepExecution: $stepExecution")
+        }
         // Update progress even in case of error to maintain accurate counts
         tracker.updateProgress(jobId = jobId) {
             totalRead = stepExecution.readCount

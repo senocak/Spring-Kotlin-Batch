@@ -132,7 +132,7 @@ class BatchController(
                     jobExplorer.getJobExecutions(jobInstance).map { execution: JobExecution ->
                         mapOf(
                             "jobExecutionId" to execution.id,
-                            "jobID" to execution.jobParameters.getString("JobID")!!,
+                            "jobID" to (execution.jobParameters.getString("JobID") ?: execution.id.toString()),
                             "jobName" to execution.jobInstance.jobName,
                             "status" to execution.status.toString(),
                             "startTime" to (execution.startTime?.format(ISO_DATE_TIME) ?: ""),

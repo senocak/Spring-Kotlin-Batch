@@ -25,12 +25,11 @@ class TrafficDensitySkipListener(
         // Access the current job execution context through Spring's ExecutionContext
         val jobExecution: JobExecution = org.springframework.batch.core.scope.context.JobSynchronizationManager.getContext()?.jobExecution
             ?: throw IllegalStateException("No job execution context found")
-        return jobExecution.jobParameters.getString("JobID")
-            ?: throw IllegalStateException("JobID parameter is missing")
+        return jobExecution.jobParameters.getString("JobID") ?: jobExecution.id.toString()
     }
 
     override fun onSkipInProcess(item: TrafficDensity, t: Throwable) {
-        log.error("Skip Listener - onSkipInProcess called for item: $item, Exception: ${t.message}", t)
+        log.error("Skip Listener - onSkipInProcess called for item: $item, Exception: ${t.message}")
         val jobId: String = getJobId()
         progressTracker.updateProgress(jobId = jobId) {
             totalRead++
@@ -45,7 +44,7 @@ class TrafficDensitySkipListener(
     }
 
     override fun onSkipInWrite(item: TrafficDensity, t: Throwable) {
-        log.error("Skip Listener - onSkipInWrite called for item: $item, Exception: ${t.message}")
+        log.info("Skip Listener - write skip for item: $item")
         val jobId: String = getJobId()
         progressTracker.updateProgress(jobId = jobId) {
             totalWritten--

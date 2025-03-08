@@ -103,6 +103,7 @@ class BatchConfig(
             .faultTolerant()
             .skip(Exception::class.java)
             //.skipLimit(1000) // Allow up to 1000 skips
+            //.noRollback(IllegalArgumentException::class.java)
             .skipPolicy(skipPolicy())
             .processorNonTransactional()
             .listener(chunkListener) // Add the chunk listener here
